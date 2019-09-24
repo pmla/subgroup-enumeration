@@ -16,6 +16,7 @@
 
 import itertools
 import numpy as np
+from collections import defaultdict
 
 
 def get_divisors(n):
@@ -54,9 +55,7 @@ def get_subgroup_elements(orders, H):
         indices[:, 1] += H[2, 1] * p
         indices[:, 2] += H[2, 2] * p
 
-    for i, e in enumerate(orders):
-        indices[:, i] %= e
-    return indices
+    return indices % orders
 
 
 def consistent_first_rows(dimension, dm, ffilter):
@@ -149,7 +148,7 @@ def enumerate_subgroup_bases(orders, ffilter=None):
                             yield np.array([[a, 0, 0], [s, b, 0], [u, v, c]])
 
 
-def count_subgroups(orders):
+def count_subgroups(orders, count_orders=False):
     """Count the number of subgroups of a cyclic/dicyclic/tricyclic integer
     group.
 
@@ -167,6 +166,7 @@ def count_subgroups(orders):
         Subgroup basis.
     """
     gcd = np.gcd
+
     def P(n):
         return sum([gcd(k, n) for k in range(1, n + 1)])
 
@@ -180,21 +180,29 @@ def count_subgroups(orders):
         m, n, r = orders
     dm = get_divisors(m)
 
+    counts = defaultdict(int)
     if dimension == 1:
-        return len(dm)
+        for a in dm:
+            counts[a] += 1
     elif dimension == 2:
         dn = get_divisors(n)
-        return sum([gcd(a, b) for a in dm for b in dn])
+        for a, b in itertools.product(dm, dn):
+            num = gcd(a, b)
+            counts[np.prod([a, b])] += num
     else:
         dn = get_divisors(n)
         dr = get_divisors(r)
 
-        total = 0
         for a, b, c in itertools.product(dm, dn, dr):
             A = gcd(a, n // b)
             B = gcd(b, r // c)
             C = gcd(a, r // c)
             ABC = A * B * C
             X = ABC // gcd(a * r // c, ABC)
-            total += ABC // X**2 * P(X)
-        return total
+            num = ABC // X**2 * P(X)
+            counts[np.prod([a, b, c])] += num
+
+    if count_orders:
+        return sorted(counts.items())
+    else:
+        return sum(counts.values())
